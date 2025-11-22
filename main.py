@@ -7,6 +7,7 @@ import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.utils import get_openapi
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -64,6 +65,41 @@ app.add_middleware(
 # Include public API router
 from api.public.v1 import router as public_router
 app.include_router(public_router)
+
+# Include voice API router
+from api.voice.v1 import router as voice_router
+app.include_router(voice_router)
+
+
+def custom_openapi():
+    """Custom OpenAPI schema generator with error handling"""
+    if app.openapi_schema:
+        return app.openapi_schema
+    
+    try:
+        openapi_schema = get_openapi(
+            title=app.title,
+            version=app.version,
+            description=app.description,
+            routes=app.routes,
+        )
+        app.openapi_schema = openapi_schema
+        return openapi_schema
+    except Exception as e:
+        logger.error(f"OpenAPI generation failed: {e}")
+        # Return minimal valid OpenAPI schema as fallback
+        return {
+            "openapi": "3.0.0",
+            "info": {
+                "title": app.title,
+                "version": app.version,
+                "description": "API documentation temporarily unavailable"
+            },
+            "paths": {}
+        }
+
+
+app.openapi = custom_openapi
 
 
 @app.get("/")
