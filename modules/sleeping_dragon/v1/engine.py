@@ -3,6 +3,8 @@ Sleeping Dragon Analysis Engine
 Analyzes manager's dialogue and provides warm, constructive feedback
 """
 import logging
+import json
+import random
 from typing import List, Dict, Any
 from core.voice_gateway.v1.pipeline import get_pipeline
 
@@ -59,7 +61,6 @@ async def analyze_dialogue(
         
         # Try to parse JSON response
         try:
-            import json
             # Try to extract JSON from response
             if "{" in response and "}" in response:
                 json_start = response.index("{")

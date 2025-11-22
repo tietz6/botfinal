@@ -3,6 +3,7 @@ LLM Service - Real DeepSeek API Integration
 """
 import os
 import logging
+import random
 import httpx
 from typing import List, Dict, Any
 
@@ -107,8 +108,6 @@ class LLMService:
     
     def _generate_coach_response(self, user_msg: str) -> str:
         """Generate coach-style feedback"""
-        import random
-        
         responses = [
             "Хорошее начало! Попробуй добавить больше тепла и задать уточняющий вопрос.",
             "Отлично! Ты проявил эмпатию. Теперь можно мягко подвести к следующему этапу.",
@@ -126,8 +125,6 @@ class LLMService:
     
     def _generate_client_response(self, user_msg: str) -> str:
         """Generate client-style responses"""
-        import random
-        
         positive_words = ["спасибо", "отлично", "интересно", "хорошо", "да", "понял"]
         doubt_words = ["не знаю", "дорого", "подумать", "позже", "сомневаюсь"]
         
