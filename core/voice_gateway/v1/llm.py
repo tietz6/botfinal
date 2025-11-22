@@ -1,84 +1,87 @@
-"""Voice Gateway V1 - LLM communication pipeline"""
+"""
+LLM Service - Real DeepSeek API Integration
+"""
 import os
 import logging
+import random
+import httpx
 from typing import List, Dict, Any
-
-# Import new components
-from .llm import get_llm_service, LLMService
-from .asr import get_asr_service, ASRService
-from .tts import get_tts_service, TTSService
-from .pipeline import get_pipeline as get_voice_pipeline, VoicePipeline as NewVoicePipeline
 
 logger = logging.getLogger(__name__)
 
 
-class VoicePipeline:
-    """
-    Unified LLM gateway for all modules.
-    Provides fallback behavior if external LLM API is not available.
-    """
+class LLMService:
+    """DeepSeek LLM integration service"""
     
     def __init__(self):
-        self.api_key = os.getenv("LLM_API_KEY", "")
-        self.api_url = os.getenv("LLM_API_URL", "")
-        self.has_external_api = bool(self.api_key and self.api_url)
+        self.api_key = os.getenv("DEEPSEEK_API_KEY", "")
+        self.api_base_url = os.getenv("DEEPSEEK_API_BASE_URL", "https://api.deepseek.com/v1")
+        self.chat_endpoint = f"{self.api_base_url}/chat/completions"
         
-        if not self.has_external_api:
-            logger.warning("LLM API not configured, using fallback mode")
+        if not self.api_key:
+            logger.warning("DEEPSEEK_API_KEY not set, LLM service may not work properly")
     
-    async def llm_chat(self, messages: List[Dict[str, str]]) -> str:
+    async def chat(
+        self,
+        messages: List[Dict[str, str]],
+        temperature: float = 0.7,
+        max_tokens: int = 500
+    ) -> str:
         """
-        Main method for LLM communication.
+        Send chat request to DeepSeek API.
         
         Args:
             messages: List of message dicts with 'role' and 'content'
                      Example: [{"role": "system", "content": "..."}, {"role": "user", "content": "..."}]
+            temperature: Sampling temperature (0.0 - 1.0)
+            max_tokens: Maximum tokens to generate
         
         Returns:
             Generated response text
         """
-        if self.has_external_api:
-            return await self._call_external_api(messages)
-        else:
-            return await self._fallback_response(messages)
-    
-    async def _call_external_api(self, messages: List[Dict[str, str]]) -> str:
-        """Call external LLM API (DeepSeek or similar)"""
+        if not self.api_key:
+            logger.error("DEEPSEEK_API_KEY not configured")
+            return self._fallback_response(messages)
+        
         try:
-            import httpx
-            
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(
-                    self.api_url,
+                    self.chat_endpoint,
                     headers={
                         "Authorization": f"Bearer {self.api_key}",
                         "Content-Type": "application/json"
                     },
                     json={
+                        "model": "deepseek-chat",
                         "messages": messages,
-                        "temperature": 0.7,
-                        "max_tokens": 500
+                        "temperature": temperature,
+                        "max_tokens": max_tokens
                     }
                 )
+                
                 response.raise_for_status()
                 data = response.json()
                 
-                # Handle different API response formats
-                if "choices" in data:
+                # Extract response from DeepSeek format
+                if "choices" in data and len(data["choices"]) > 0:
                     return data["choices"][0]["message"]["content"]
-                elif "response" in data:
-                    return data["response"]
                 else:
-                    return data.get("content", "")
+                    logger.error(f"Unexpected API response format: {data}")
+                    return self._fallback_response(messages)
                     
+        except httpx.HTTPStatusError as e:
+            logger.error(f"DeepSeek API HTTP error: {e.response.status_code} - {e.response.text}")
+            return self._fallback_response(messages)
+        except httpx.TimeoutException:
+            logger.error("DeepSeek API timeout")
+            return self._fallback_response(messages)
         except Exception as e:
-            logger.error(f"External API call failed: {e}")
-            return await self._fallback_response(messages)
+            logger.error(f"DeepSeek API call failed: {e}")
+            return self._fallback_response(messages)
     
-    async def _fallback_response(self, messages: List[Dict[str, str]]) -> str:
+    def _fallback_response(self, messages: List[Dict[str, str]]) -> str:
         """
-        Fallback response generator when external API is unavailable.
-        Provides reasonable responses based on message context.
+        Generate fallback response when API is unavailable.
         """
         if not messages:
             return "Привет! Я готов помочь."
@@ -94,16 +97,16 @@ class VoicePipeline:
         
         # Coach responses
         if "coach" in system_context or "коуч" in system_context:
-            return self._generate_coach_response(last_message, system_context)
+            return self._generate_coach_response(last_message)
         
         # Client responses
         if "client" in system_context or "клиент" in system_context:
-            return self._generate_client_response(last_message, system_context)
+            return self._generate_client_response(last_message)
         
         # Default friendly response
         return "Отличный вопрос! Давайте подумаем об этом вместе. Что для вас важнее всего в этом вопросе?"
     
-    def _generate_coach_response(self, user_msg: str, context: str) -> str:
+    def _generate_coach_response(self, user_msg: str) -> str:
         """Generate coach-style feedback"""
         responses = [
             "Хорошее начало! Попробуй добавить больше тепла и задать уточняющий вопрос.",
@@ -113,18 +116,15 @@ class VoicePipeline:
             "Супер! Теперь можно углубиться в детали и показать искренний интерес."
         ]
         
-        # Simple heuristic based on message length and keywords
         if len(user_msg) < 30:
             return "Хорошее начало! Попробуй развить мысль подробнее и добавь личный вопрос."
         elif "?" not in user_msg:
             return "Отлично! Добавь вопрос в конце, чтобы поддержать диалог."
         else:
-            import random
             return random.choice(responses)
     
-    def _generate_client_response(self, user_msg: str, context: str) -> str:
+    def _generate_client_response(self, user_msg: str) -> str:
         """Generate client-style responses"""
-        # Detect sentiment
         positive_words = ["спасибо", "отлично", "интересно", "хорошо", "да", "понял"]
         doubt_words = ["не знаю", "дорого", "подумать", "позже", "сомневаюсь"]
         
@@ -151,32 +151,16 @@ class VoicePipeline:
                 "Понятно. А как это мне поможет?",
             ]
         
-        import random
         return random.choice(responses)
 
 
 # Singleton instance
-_pipeline = None
+_llm_service = None
 
 
-def get_pipeline() -> VoicePipeline:
-    """Get or create VoicePipeline singleton (legacy compatibility)"""
-    global _pipeline
-    if _pipeline is None:
-        _pipeline = VoicePipeline()
-    return _pipeline
-
-
-# Export new API
-__all__ = [
-    "VoicePipeline",
-    "get_pipeline",
-    "NewVoicePipeline",
-    "get_voice_pipeline",
-    "LLMService",
-    "get_llm_service",
-    "ASRService",
-    "get_asr_service",
-    "TTSService",
-    "get_tts_service"
-]
+def get_llm_service() -> LLMService:
+    """Get or create LLMService singleton"""
+    global _llm_service
+    if _llm_service is None:
+        _llm_service = LLMService()
+    return _llm_service
