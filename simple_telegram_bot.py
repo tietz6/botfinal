@@ -6,6 +6,8 @@ import os
 import logging
 import asyncio
 import httpx
+import tempfile
+from pathlib import Path
 from typing import Dict, Any, Optional
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -47,7 +49,7 @@ def get_user_session(user_id: int) -> Dict[str, Any]:
     return user_sessions[user_id]
 
 
-async def call_backend(endpoint: str, method: str = "GET", data: Dict = None) -> Optional[Dict]:
+async def call_backend(endpoint: str, method: str = "GET", data: Dict = None, files: Dict = None) -> Optional[Dict]:
     """
     Call backend API.
     
@@ -55,6 +57,7 @@ async def call_backend(endpoint: str, method: str = "GET", data: Dict = None) ->
         endpoint: API endpoint (e.g., '/master_path/start/session123')
         method: HTTP method
         data: Request data for POST
+        files: Files for multipart upload
     
     Returns:
         Response data or None on error
@@ -62,14 +65,24 @@ async def call_backend(endpoint: str, method: str = "GET", data: Dict = None) ->
     url = f"{BACKEND_URL}{endpoint}"
     
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=60.0) as client:
             if method == "POST":
-                response = await client.post(url, json=data or {})
+                if files:
+                    response = await client.post(url, files=files, data=data or {})
+                else:
+                    response = await client.post(url, json=data or {})
             else:
                 response = await client.get(url)
             
             response.raise_for_status()
-            return response.json()
+            
+            # Check if response is JSON or binary
+            content_type = response.headers.get("content-type", "")
+            if "application/json" in content_type:
+                return response.json()
+            else:
+                # Return binary content for audio
+                return {"audio": response.content, "content_type": content_type}
     except httpx.HTTPError as e:
         logger.error(f"Backend call failed: {e}")
         return None
@@ -91,6 +104,8 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 💬 Отработке возражений
 💎 Допродажам без давления
 🎯 Полному циклу сделки
+
+💬 Пиши текстом или 🎤 отправляй голосовые сообщения!
 
 **Выбери свой уровень:**"""
     
@@ -202,7 +217,7 @@ async def start_training_module(query, user_id: int, module: str):
     if client_message:
         response_text += f"\n\n**Клиент:**\n{client_message}"
     
-    response_text += f"\n\n💬 _Напиши свой ответ в чат_"
+    response_text += f"\n\n💬 _Напиши свой ответ в чат или отправь голосовое сообщение 🎤_"
     
     keyboard = [[InlineKeyboardButton("❌ Завершить тренировку", callback_data="main_menu")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -325,12 +340,123 @@ async def master_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     session["state"] = "training"
     
     coach_message = result.get("coach_message", "")
-    response_text = f"{coach_message}\n\n💬 _Напиши свой ответ в чат_"
+    response_text = f"{coach_message}\n\n💬 _Напиши свой ответ в чат или отправь голосовое сообщение 🎤_"
     
     keyboard = [[InlineKeyboardButton("❌ Завершить", callback_data="main_menu")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await update.message.reply_text(response_text, reply_markup=reply_markup, parse_mode="Markdown")
+
+
+async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle voice messages"""
+    user_id = update.effective_user.id
+    session = get_user_session(user_id)
+    
+    # Check if in training mode
+    if session["state"] != "training" or not session["active_module"]:
+        await update.message.reply_text(
+            "🎤 Голосовые сообщения поддерживаются только в режиме тренировки.\n"
+            "Используй /start для начала работы."
+        )
+        return
+    
+    try:
+        # Show recording indicator
+        await update.message.chat.send_action("record_voice")
+        
+        # Get voice file
+        voice = update.message.voice
+        voice_file = await context.bot.get_file(voice.file_id)
+        
+        # Download voice to temporary file
+        with tempfile.NamedTemporaryFile(suffix=".ogg", delete=False) as tmp_file:
+            tmp_path = tmp_file.name
+            await voice_file.download_to_drive(tmp_path)
+        
+        # Read audio data
+        with open(tmp_path, "rb") as f:
+            audio_data = f.read()
+        
+        # Clean up temp file
+        os.unlink(tmp_path)
+        
+        # Show typing indicator
+        await update.message.chat.send_action("typing")
+        
+        # Process through voice gateway
+        # First, transcribe to text
+        asr_response = await call_backend(
+            "/voice/v1/asr",
+            method="POST",
+            files={"audio": ("voice.ogg", audio_data, "audio/ogg")}
+        )
+        
+        if not asr_response or not asr_response.get("success"):
+            await update.message.reply_text(
+                "❌ Не удалось распознать голос. Попробуй ещё раз или напиши текстом."
+            )
+            return
+        
+        user_text = asr_response.get("text", "")
+        
+        # Show what was recognized
+        await update.message.reply_text(f"🎤 Я услышал: _{user_text}_", parse_mode="Markdown")
+        
+        # Process through module backend
+        module = session["active_module"]
+        session_id = session["session_id"]
+        
+        result = await call_backend(
+            f"/{module}/turn/{session_id}",
+            method="POST",
+            data={"text": user_text}
+        )
+        
+        if not result or not result.get("success"):
+            await update.message.reply_text(
+                "❌ Ошибка при обработке сообщения. Попробуй ещё раз."
+            )
+            return
+        
+        # Get text response
+        client_reply = result.get("client_reply", "")
+        coach_tip = result.get("coach_tip") or result.get("coach_feedback") or result.get("coach_analysis") or result.get("coach_note", "")
+        
+        response_text = ""
+        if client_reply:
+            response_text += f"**Клиент:**\n{client_reply}\n\n"
+        if coach_tip:
+            response_text += f"**Коуч:**\n{coach_tip}\n\n"
+        
+        # Send text response first
+        keyboard = [[InlineKeyboardButton("❌ Завершить", callback_data="main_menu")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.message.reply_text(response_text, reply_markup=reply_markup, parse_mode="Markdown")
+        
+        # Try to send voice response if client replied
+        if client_reply:
+            await update.message.chat.send_action("record_voice")
+            
+            # Synthesize client reply to voice
+            tts_response = await call_backend(
+                "/voice/v1/tts",
+                method="POST",
+                data={"text": client_reply}
+            )
+            
+            if tts_response and "audio" in tts_response:
+                # Send voice message
+                await update.message.reply_voice(
+                    voice=tts_response["audio"],
+                    caption="🎤 Голосовой ответ клиента"
+                )
+        
+    except Exception as e:
+        logger.error(f"Voice handling error: {e}")
+        await update.message.reply_text(
+            "❌ Ошибка при обработке голосового сообщения. Попробуй написать текстом."
+        )
 
 
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -361,6 +487,7 @@ def main():
     application.add_handler(CommandHandler("result", result_command))
     application.add_handler(CallbackQueryHandler(button_callback))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    application.add_handler(MessageHandler(filters.VOICE, handle_voice))
     application.add_error_handler(error_handler)
     
     # Start bot
