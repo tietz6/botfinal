@@ -2,7 +2,7 @@
 import aiosqlite
 import json
 import os
-from typing import Any, Optional
+from typing import Any, Optional, List
 from pathlib import Path
 
 DB_PATH = Path(__file__).parent.parent.parent / "salesbot.db"
@@ -56,7 +56,7 @@ async def delete_state(key: str):
         await db.commit()
 
 
-async def list_keys(prefix: str = "") -> list[str]:
+async def list_keys(prefix: str = "") -> List[str]:
     """List all keys with optional prefix"""
     async with aiosqlite.connect(DB_PATH) as db:
         if prefix:
