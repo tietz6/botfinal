@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 from core.state import get_state, set_state
 from core.llm_gateway import get_llm_gateway
+from core.utils import evaluate_manager_message
 
 logger = logging.getLogger(__name__)
 
@@ -181,8 +182,8 @@ async def exam_turn(session_id: str, request: TurnRequest):
             "round": exam_state["current_round"]
         })
         
-        # Evaluate round
-        round_score = _evaluate_turn(request.text, exam_state["current_round"])
+        # Evaluate round using shared utility
+        round_score = evaluate_manager_message(request.text, exam_state["current_round"])
         exam_state["round_scores"].append(round_score)
         
         # Move to next round
@@ -297,31 +298,6 @@ async def get_scenarios():
             for scenario_id, scenario in SCENARIOS.items()
         ]
     }
-
-
-def _evaluate_turn(manager_text: str, round_num: int) -> int:
-    """Simple evaluation of manager's turn"""
-    score = 5  # Base score
-    
-    text_lower = manager_text.lower()
-    
-    # Positive indicators
-    if "?" in manager_text:
-        score += 1
-    if any(word in text_lower for word in ["привет", "здравств", "рад", "понимаю"]):
-        score += 1
-    if len(manager_text) > 50 and len(manager_text) < 300:
-        score += 1
-    if round_num > 2 and any(word in text_lower for word in ["песн", "подарок", "память"]):
-        score += 1
-    
-    # Negative indicators
-    if any(word in text_lower for word in ["акция", "скидка", "срочно", "успей"]):
-        score -= 2
-    if round_num == 1 and any(word in text_lower for word in ["цена", "стоимость", "рубл"]):
-        score -= 1
-    
-    return max(1, min(10, score))
 
 
 def _get_difficulty(rounds: int) -> str:

@@ -294,29 +294,40 @@ def _get_coach_intro(topic: str) -> str:
 def _update_scores(session_state: dict, manager_text: str, coach_feedback: str):
     """Update scores based on manager's message"""
     scores = session_state["scores"]
+    turn_count = session_state["turn_count"]
     
-    # Simple heuristics
+    # Simple heuristics - calculate per-turn score and average with existing
     text_lower = manager_text.lower()
     
     # Warmth: check for friendly words
     warmth_words = ["привет", "здравствуй", "рад", "приятно", "спасибо", "понимаю"]
-    warmth_count = sum(1 for word in warmth_words if word in text_lower)
-    scores["warmth"] = min(10, scores["warmth"] + warmth_count)
+    warmth_score = min(10, sum(2 for word in warmth_words if word in text_lower))
+    scores["warmth"] = (scores["warmth"] * (turn_count - 1) + warmth_score) / turn_count
     
     # Questions: check for question marks
     questions_count = manager_text.count("?")
-    scores["questions"] = min(10, scores["questions"] + questions_count)
+    questions_score = min(10, questions_count * 3)
+    scores["questions"] = (scores["questions"] * (turn_count - 1) + questions_score) / turn_count
     
     # Pressure-free: penalize if pushing too hard
     pressure_words = ["срочно", "акция", "скидка", "только сегодня", "успей"]
     pressure_count = sum(1 for word in pressure_words if word in text_lower)
-    scores["pressure_free"] = max(0, 10 - pressure_count * 2)
+    pressure_score = max(0, 10 - pressure_count * 3)
+    scores["pressure_free"] = (scores["pressure_free"] * (turn_count - 1) + pressure_score) / turn_count
     
     # Clarity: longer, structured messages get points
-    if len(manager_text) > 50 and len(manager_text) < 300:
-        scores["clarity"] = min(10, scores["clarity"] + 1)
+    clarity_score = 7 if 50 < len(manager_text) < 300 else 5
+    scores["clarity"] = (scores["clarity"] * (turn_count - 1) + clarity_score) / turn_count
     
-    # Structure: normalize scores to 0-10 range
+    # Structure: based on presence of structure elements
+    structure_score = 5
+    if "?" in manager_text:
+        structure_score += 2
+    if len(manager_text) > 50:
+        structure_score += 2
+    scores["structure"] = (scores["structure"] * (turn_count - 1) + min(10, structure_score)) / turn_count
+    
+    # Normalize scores to 0-10 range
     for key in scores:
         scores[key] = max(0, min(10, scores[key]))
 

@@ -1,5 +1,6 @@
 """Cases Analyzer API Routes"""
 import logging
+import re
 from typing import List
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -114,7 +115,6 @@ def _extract_score(text: str) -> float:
     """Extract score from analysis text"""
     try:
         # Look for БАЛЛЫ: [число] or numbers after "оценка"
-        import re
         
         # Try to find explicit score
         score_match = re.search(r'БАЛЛЫ:\s*(\d+(?:\.\d+)?)', text, re.IGNORECASE)
@@ -135,7 +135,6 @@ def _extract_score(text: str) -> float:
 def _extract_list(text: str, section_name: str) -> List[str]:
     """Extract list items from section"""
     try:
-        import re
         
         # Find section
         pattern = f"{section_name}:(.+?)(?:СЛАБЫЕ|КЛЮЧЕВЫЕ|СОВЕТЫ|$)"
@@ -163,7 +162,6 @@ def _extract_list(text: str, section_name: str) -> List[str]:
 def _extract_section(text: str, section_name: str) -> str:
     """Extract section text"""
     try:
-        import re
         
         pattern = f"{section_name}:(.+?)(?:СИЛЬНЫЕ|СЛАБЫЕ|КЛЮЧЕВЫЕ|$)"
         match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
@@ -192,7 +190,7 @@ def _extract_key_moments(text: str, dialog: List[DialogMessage]) -> List[dict]:
             if i == 0 and "?" not in msg.content:
                 issue = "Нет вопроса в первом сообщении"
                 suggestion = "Начинай с открытого вопроса для установления контакта"
-            elif "цена" in msg_lower or "стоимость" in msg_lower and i <= 2:
+            elif ("цена" in msg_lower or "стоимость" in msg_lower) and i <= 2:
                 issue = "Слишком рано перешёл к цене"
                 suggestion = "Сначала выясни потребности, потом говори о цене"
             elif len(msg.content) > 500:

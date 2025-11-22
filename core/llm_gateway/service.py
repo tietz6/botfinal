@@ -3,6 +3,7 @@ LLM Gateway Service - Unified wrapper around existing LLMService.
 Provides convenient methods for different use cases.
 """
 import logging
+import math
 from typing import Dict, Any, List
 from core.voice_gateway.v1.llm import get_llm_service
 
@@ -246,7 +247,8 @@ class LLMGateway:
         platform = context.get("platform", "sora")
         chunk_duration = context.get("chunk_duration_sec", 5)
         
-        total_chunks = int(duration / chunk_duration)
+        # Use ceiling to ensure full duration is covered
+        total_chunks = math.ceil(duration / chunk_duration)
         
         system_prompt = f"""Ты — режиссёр видеоклипов для проекта "На Счастье".
 Создай timeline промтов для генерации видео по тексту песни.
