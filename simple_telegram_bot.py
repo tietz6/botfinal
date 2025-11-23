@@ -262,7 +262,7 @@ async def show_training_menu(query, user_id: int):
 Выбери тренировку:"""
     
     keyboard = [
-        [InlineKeyboardButton("📖 Script Lab (практика скриптов)", callback_data="module_training_scripts")],
+        [InlineKeyboardButton("📖 Script Lab (практика скриптов)", callback_data="module_script_lab")],
         [InlineKeyboardButton("🎯 Путь Мастера", callback_data="module_master_path")],
         [InlineKeyboardButton("🛡️ Возражения", callback_data="module_objections")],
         [InlineKeyboardButton("💎 Допродажи", callback_data="module_upsell")],
