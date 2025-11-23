@@ -94,28 +94,63 @@ async def call_backend(endpoint: str, method: str = "GET", data: Dict = None, fi
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /start command"""
     user = update.effective_user
+    user_id = user.id
     
+    # Check if user has a role assigned
+    role_response = await call_backend(f"/api/public/v1/get_role/{user_id}")
+    
+    if not role_response or not role_response.get("role"):
+        # User needs to select a role first
+        await show_role_selection(update)
+        return
+    
+    # User has a role, show main menu
     welcome_text = f"""👋 Привет, {user.first_name}!
 
-Добро пожаловать в **SALESBOT** — систему тренировок для менеджеров проекта "На Счастье"!
-
-Здесь ты научишься:
-✨ Тёплому общению с клиентами
-💬 Отработке возражений
-💎 Допродажам без давления
-🎯 Полному циклу сделки
+Добро пожаловать в **SALESBOT** — систему тренировок для проекта "На Счастье"!
 
 💬 Пиши текстом или 🎤 отправляй голосовые сообщения!
 
-**Выбери свой уровень:**"""
+**Выбери раздел:**"""
     
-    keyboard = [
-        [InlineKeyboardButton("🌱 Я новичок", callback_data="level_beginner")],
-        [InlineKeyboardButton("📈 У меня есть база", callback_data="level_advanced")],
-    ]
+    role = role_response.get("role")
+    keyboard = []
+    
+    # Training modules for all roles
+    keyboard.append([InlineKeyboardButton("🎓 Школа продаж", callback_data="section_training")])
+    
+    # Encyclopedia for all roles
+    keyboard.append([InlineKeyboardButton("📚 База знаний", callback_data="section_encyclopedia")])
+    
+    # Content creation for generators and admins
+    if role in ["generator", "admin"]:
+        keyboard.append([InlineKeyboardButton("🎨 Создание контента", callback_data="section_content")])
+    
+    # Change role option
+    keyboard.append([InlineKeyboardButton("👤 Изменить роль", callback_data="change_role")])
+    
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await update.message.reply_text(welcome_text, reply_markup=reply_markup, parse_mode="Markdown")
+
+
+async def show_role_selection(update: Update):
+    """Show role selection menu"""
+    text = """👋 Добро пожаловать в SALESBOT!
+
+Для начала работы выбери свою роль:"""
+    
+    keyboard = [
+        [InlineKeyboardButton("👨‍💼 Менеджер по продажам", callback_data="role_manager")],
+        [InlineKeyboardButton("🎨 Генератор контента", callback_data="role_generator")],
+        [InlineKeyboardButton("👑 Руководство", callback_data="role_admin")],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    if update.message:
+        await update.message.reply_text(text, reply_markup=reply_markup, parse_mode="Markdown")
+    elif update.callback_query:
+        await update.callback_query.edit_message_text(text, reply_markup=reply_markup, parse_mode="Markdown")
 
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -126,45 +161,92 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = query.from_user.id
     data = query.data
     
-    if data == "level_beginner":
+    # Role selection
+    if data.startswith("role_"):
+        role = data.replace("role_", "")
+        await set_user_role_handler(query, user_id, role)
+    elif data == "change_role":
+        await show_role_selection(query)
+    
+    # Section navigation
+    elif data == "section_training":
+        await show_training_menu(query, user_id)
+    elif data == "section_encyclopedia":
+        await show_encyclopedia_menu(query, user_id)
+    elif data == "section_content":
+        await show_content_menu(query, user_id)
+    
+    # Legacy support
+    elif data == "level_beginner":
         await show_beginner_menu(query, user_id)
     elif data == "level_advanced":
         await show_advanced_menu(query, user_id)
+    
+    # Module actions
     elif data.startswith("module_"):
         module = data.replace("module_", "")
         await start_training_module(query, user_id, module)
+    elif data.startswith("encyclopedia_"):
+        page_id = data.replace("encyclopedia_", "")
+        await show_encyclopedia_page(query, user_id, page_id)
+    
+    # Navigation
     elif data == "main_menu":
         await show_main_menu(query, user_id)
+    elif data == "back_training":
+        await show_training_menu(query, user_id)
+    elif data == "back_content":
+        await show_content_menu(query, user_id)
 
 
-async def show_beginner_menu(query, user_id: int):
-    """Show beginner training menu"""
-    text = """🌱 **Путь новичка**
-
-Рекомендую начать с этих модулей:"""
+async def set_user_role_handler(query, user_id: int, role: str):
+    """Set user role"""
+    result = await call_backend(
+        "/api/public/v1/set_role",
+        method="POST",
+        data={"user_id": str(user_id), "role": role}
+    )
     
-    keyboard = [
-        [InlineKeyboardButton("🎯 Путь Мастера", callback_data="module_master_path")],
-        [InlineKeyboardButton("🛡️ Возражения", callback_data="module_objections")],
-        [InlineKeyboardButton("🎪 Арена (свободная практика)", callback_data="module_arena")],
-        [InlineKeyboardButton("« Назад", callback_data="main_menu")]
-    ]
+    if not result or not result.get("success"):
+        await query.edit_message_text(
+            "❌ Ошибка при установке роли. Попробуй ещё раз.",
+            parse_mode="Markdown"
+        )
+        return
+    
+    role_names = {
+        "manager": "Менеджер по продажам",
+        "generator": "Генератор контента",
+        "admin": "Руководство"
+    }
+    
+    text = f"""✅ Роль установлена: **{role_names.get(role, role)}**
+
+Теперь выбери раздел для работы:"""
+    
+    keyboard = []
+    keyboard.append([InlineKeyboardButton("🎓 Школа продаж", callback_data="section_training")])
+    keyboard.append([InlineKeyboardButton("📚 База знаний", callback_data="section_encyclopedia")])
+    
+    if role in ["generator", "admin"]:
+        keyboard.append([InlineKeyboardButton("🎨 Создание контента", callback_data="section_content")])
+    
     reply_markup = InlineKeyboardMarkup(keyboard)
-    
     await query.edit_message_text(text, reply_markup=reply_markup, parse_mode="Markdown")
 
 
-async def show_advanced_menu(query, user_id: int):
-    """Show advanced training menu"""
-    text = """📈 **Продвинутый уровень**
+async def show_training_menu(query, user_id: int):
+    """Show training modules menu"""
+    text = """🎓 **Школа продаж**
 
-Выбери нужный модуль:"""
+Выбери тренировку:"""
     
     keyboard = [
+        [InlineKeyboardButton("📖 Script Lab (практика скриптов)", callback_data="module_training_scripts")],
         [InlineKeyboardButton("🎯 Путь Мастера", callback_data="module_master_path")],
         [InlineKeyboardButton("🛡️ Возражения", callback_data="module_objections")],
         [InlineKeyboardButton("💎 Допродажи", callback_data="module_upsell")],
-        [InlineKeyboardButton("🎪 Арена", callback_data="module_arena")],
+        [InlineKeyboardButton("🎪 Арена (свободная практика)", callback_data="module_arena")],
         [InlineKeyboardButton("📝 Экзамен", callback_data="module_exam")],
         [InlineKeyboardButton("« Назад", callback_data="main_menu")]
     ]
@@ -173,18 +255,126 @@ async def show_advanced_menu(query, user_id: int):
     await query.edit_message_text(text, reply_markup=reply_markup, parse_mode="Markdown")
 
 
-async def show_main_menu(query, user_id: int):
-    """Show main menu"""
-    text = """**SALESBOT** — Главное меню
+async def show_encyclopedia_menu(query, user_id: int):
+    """Show encyclopedia menu"""
+    # Get user role
+    role_response = await call_backend(f"/api/public/v1/get_role/{user_id}")
+    role = role_response.get("role", "manager") if role_response else "manager"
+    
+    # Get available pages
+    pages_response = await call_backend(f"/encyclopedia/v1/pages?role={role}")
+    
+    if not pages_response or not pages_response.get("success"):
+        await query.edit_message_text(
+            "❌ Ошибка при загрузке базы знаний.",
+            parse_mode="Markdown"
+        )
+        return
+    
+    text = """📚 **База знаний**
 
-Выбери свой уровень:"""
+Выбери раздел:"""
+    
+    keyboard = []
+    pages = pages_response.get("pages", [])
+    
+    for page in pages[:8]:  # Limit to 8 pages to fit in message
+        page_id = page.get("id", "")
+        title = page.get("title", "")
+        keyboard.append([InlineKeyboardButton(f"📄 {title}", callback_data=f"encyclopedia_{page_id}")])
+    
+    keyboard.append([InlineKeyboardButton("« Назад", callback_data="main_menu")])
+    
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.edit_message_text(text, reply_markup=reply_markup, parse_mode="Markdown")
+
+
+async def show_content_menu(query, user_id: int):
+    """Show content creation menu"""
+    text = """🎨 **Создание контента**
+
+Выбери инструмент:"""
     
     keyboard = [
-        [InlineKeyboardButton("🌱 Я новичок", callback_data="level_beginner")],
-        [InlineKeyboardButton("📈 У меня есть база", callback_data="level_advanced")],
+        [InlineKeyboardButton("🎵 Генератор песен", callback_data="module_song_generator")],
+        [InlineKeyboardButton("🎬 Генератор видео-промптов", callback_data="module_video_prompt_generator")],
+        [InlineKeyboardButton("📸 Анимация фото", callback_data="module_photo_animation")],
+        [InlineKeyboardButton("📊 Анализ кейсов", callback_data="module_cases_analyzer")],
+        [InlineKeyboardButton("« Назад", callback_data="main_menu")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
+    await query.edit_message_text(text, reply_markup=reply_markup, parse_mode="Markdown")
+
+
+async def show_encyclopedia_page(query, user_id: int, page_id: str):
+    """Show encyclopedia page content"""
+    # Get user role for access check
+    role_response = await call_backend(f"/api/public/v1/get_role/{user_id}")
+    role = role_response.get("role", "manager") if role_response else "manager"
+    
+    # Get page content
+    page_response = await call_backend(f"/encyclopedia/v1/page/{page_id}?role={role}")
+    
+    if not page_response or not page_response.get("success"):
+        await query.edit_message_text(
+            "❌ Ошибка при загрузке страницы.",
+            parse_mode="Markdown"
+        )
+        return
+    
+    page = page_response.get("page", {})
+    title = page.get("title", "")
+    content = page.get("content", "")
+    
+    # Format content (limit to Telegram message size)
+    text = f"""📄 **{title}**
+
+{content[:3000]}"""
+    
+    if len(content) > 3000:
+        text += "\n\n_...текст обрезан, полная версия доступна в API_"
+    
+    keyboard = [[InlineKeyboardButton("« Назад к базе знаний", callback_data="section_encyclopedia")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text(text, reply_markup=reply_markup, parse_mode="Markdown")
+
+
+async def show_beginner_menu(query, user_id: int):
+    """Show beginner training menu (legacy support)"""
+    await show_training_menu(query, user_id)
+
+
+async def show_advanced_menu(query, user_id: int):
+    """Show advanced training menu (legacy support)"""
+    await show_training_menu(query, user_id)
+
+
+async def show_main_menu(query, user_id: int):
+    """Show main menu"""
+    # Get user role
+    role_response = await call_backend(f"/api/public/v1/get_role/{user_id}")
+    role = role_response.get("role") if role_response else None
+    
+    if not role:
+        await show_role_selection(query)
+        return
+    
+    text = """**SALESBOT** — Главное меню
+
+Выбери раздел:"""
+    
+    keyboard = []
+    keyboard.append([InlineKeyboardButton("🎓 Школа продаж", callback_data="section_training")])
+    keyboard.append([InlineKeyboardButton("📚 База знаний", callback_data="section_encyclopedia")])
+    
+    if role in ["generator", "admin"]:
+        keyboard.append([InlineKeyboardButton("🎨 Создание контента", callback_data="section_content")])
+    
+    keyboard.append([InlineKeyboardButton("👤 Изменить роль", callback_data="change_role")])
+    
+    reply_markup = InlineKeyboardMarkup(keyboard)
     await query.edit_message_text(text, reply_markup=reply_markup, parse_mode="Markdown")
 
 
@@ -193,6 +383,21 @@ async def start_training_module(query, user_id: int, module: str):
     session = get_user_session(user_id)
     session_id = f"tg_{user_id}_{module}"
     
+    # Handle different module types
+    if module == "song_generator":
+        await start_song_generator(query, user_id)
+        return
+    elif module == "video_prompt_generator":
+        await start_video_generator(query, user_id)
+        return
+    elif module == "photo_animation":
+        await start_photo_animation(query, user_id)
+        return
+    elif module == "cases_analyzer":
+        await start_cases_analyzer(query, user_id)
+        return
+    
+    # Standard training module start
     # Call backend to start module
     result = await call_backend(f"/{module}/start/{session_id}", method="POST")
     
@@ -225,20 +430,128 @@ async def start_training_module(query, user_id: int, module: str):
     await query.edit_message_text(response_text, reply_markup=reply_markup, parse_mode="Markdown")
 
 
+async def start_song_generator(query, user_id: int):
+    """Start song generator"""
+    text = """🎵 **Генератор песен**
+
+Опиши историю для песни. Включи:
+- Кому предназначена песня
+- Какие чувства хочешь передать
+- Важные моменты или воспоминания
+- Желаемый стиль (романтика, рок, поп и т.д.)
+
+Пример: "Хочу песню для жены на юбилей свадьбы. 10 лет вместе, познакомились в университете, вместе путешествуем. Стиль - лирическая баллада."
+
+💬 Напиши историю:"""
+    
+    # Set session state for song generation
+    session = get_user_session(user_id)
+    session["active_module"] = "song_generator"
+    session["state"] = "awaiting_song_story"
+    
+    keyboard = [[InlineKeyboardButton("« Назад", callback_data="section_content")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text(text, reply_markup=reply_markup, parse_mode="Markdown")
+
+
+async def start_video_generator(query, user_id: int):
+    """Start video prompt generator"""
+    text = """🎬 **Генератор видео-промптов**
+
+Для создания видео-клипа нужен текст песни.
+
+💬 Отправь текст песни, и я создам покадровый план для видео-платформ (Sora, VEO, Pika, Runway):"""
+    
+    session = get_user_session(user_id)
+    session["active_module"] = "video_prompt_generator"
+    session["state"] = "awaiting_video_song"
+    
+    keyboard = [[InlineKeyboardButton("« Назад", callback_data="section_content")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text(text, reply_markup=reply_markup, parse_mode="Markdown")
+
+
+async def start_photo_animation(query, user_id: int):
+    """Start photo animation"""
+    text = """📸 **Анимация фото**
+
+Этот модуль помогает создать промпты для анимации фотографий.
+
+💬 Опиши фото и что хочешь анимировать:
+
+Пример: "Фото пары на пляже на закате. Хочу оживить волны, движение волос на ветру, мягкое свечение солнца."
+
+Или просто опиши что на фото:"""
+    
+    session = get_user_session(user_id)
+    session["active_module"] = "photo_animation"
+    session["state"] = "awaiting_photo_desc"
+    
+    keyboard = [[InlineKeyboardButton("« Назад", callback_data="section_content")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text(text, reply_markup=reply_markup, parse_mode="Markdown")
+
+
+async def start_cases_analyzer(query, user_id: int):
+    """Start cases analyzer"""
+    text = """📊 **Анализ кейсов**
+
+Отправь диалог с клиентом для анализа. Формат:
+
+```
+Менеджер: Добрый день!
+Клиент: Здравствуйте
+Менеджер: Расскажите, что вас интересует?
+...
+```
+
+Я проанализирую диалог и дам детальную обратную связь.
+
+💬 Отправь диалог:"""
+    
+    session = get_user_session(user_id)
+    session["active_module"] = "cases_analyzer"
+    session["state"] = "awaiting_case_dialog"
+    
+    keyboard = [[InlineKeyboardButton("« Назад", callback_data="section_content")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text(text, reply_markup=reply_markup, parse_mode="Markdown")
+
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle user messages during training"""
     user_id = update.effective_user.id
     session = get_user_session(user_id)
     
+    state = session.get("state", "idle")
+    module = session.get("active_module")
+    
+    # Check if waiting for content generation input
+    if state == "awaiting_song_story":
+        await handle_song_story(update, user_id)
+        return
+    elif state == "awaiting_video_song":
+        await handle_video_song(update, user_id)
+        return
+    elif state == "awaiting_photo_desc":
+        await handle_photo_description(update, user_id)
+        return
+    elif state == "awaiting_case_dialog":
+        await handle_case_dialog(update, user_id)
+        return
+    
     # Check if in training mode
-    if session["state"] != "training" or not session["active_module"]:
+    if state != "training" or not module:
         await update.message.reply_text(
             "Используй /start для начала работы или выбери модуль тренировки."
         )
         return
     
     user_text = update.message.text
-    module = session["active_module"]
     session_id = session["session_id"]
     
     # Show typing indicator
@@ -279,6 +592,201 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await update.message.reply_text(response_text, reply_markup=reply_markup, parse_mode="Markdown")
+
+
+async def handle_song_story(update: Update, user_id: int):
+    """Handle song story input"""
+    story = update.message.text
+    
+    await update.message.chat.send_action("typing")
+    
+    # Call song generator API
+    result = await call_backend(
+        "/song_generator/v1/generate",
+        method="POST",
+        data={
+            "story": story,
+            "style": "romantic",  # Default style
+            "mood": "love"
+        }
+    )
+    
+    if not result or not result.get("success"):
+        await update.message.reply_text("❌ Ошибка при генерации песни. Попробуй ещё раз.")
+        return
+    
+    song = result.get("song", {})
+    title = song.get("title", "Без названия")
+    lyrics = song.get("lyrics", "")
+    
+    response = f"""🎵 **{title}**
+
+{lyrics[:2000]}"""
+    
+    if len(lyrics) > 2000:
+        response += "\n\n_...текст обрезан для отображения_"
+    
+    # Reset session
+    session = get_user_session(user_id)
+    session["state"] = "idle"
+    session["active_module"] = None
+    
+    keyboard = [
+        [InlineKeyboardButton("🔄 Создать ещё", callback_data="module_song_generator")],
+        [InlineKeyboardButton("« В меню", callback_data="section_content")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(response, reply_markup=reply_markup, parse_mode="Markdown")
+
+
+async def handle_video_song(update: Update, user_id: int):
+    """Handle video song input"""
+    song_text = update.message.text
+    
+    await update.message.chat.send_action("typing")
+    
+    result = await call_backend(
+        "/video_prompt_generator/v1/from_song",
+        method="POST",
+        data={
+            "song_text": song_text,
+            "platform": "sora",
+            "visual_style": "cinematic"
+        }
+    )
+    
+    if not result or not result.get("success"):
+        await update.message.reply_text("❌ Ошибка при генерации промптов. Попробуй ещё раз.")
+        return
+    
+    timeline = result.get("timeline", [])
+    
+    response = "🎬 **Видео-таймлайн:**\n\n"
+    for i, scene in enumerate(timeline[:5], 1):  # Show first 5 scenes
+        prompt = scene.get("prompt", "")
+        response += f"**Сцена {i}:**\n{prompt}\n\n"
+    
+    session = get_user_session(user_id)
+    session["state"] = "idle"
+    session["active_module"] = None
+    
+    keyboard = [
+        [InlineKeyboardButton("🔄 Создать ещё", callback_data="module_video_prompt_generator")],
+        [InlineKeyboardButton("« В меню", callback_data="section_content")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(response, reply_markup=reply_markup, parse_mode="Markdown")
+
+
+async def handle_photo_description(update: Update, user_id: int):
+    """Handle photo description input"""
+    description = update.message.text
+    
+    await update.message.chat.send_action("typing")
+    
+    result = await call_backend(
+        "/photo_animation/v1/prompt",
+        method="POST",
+        data={
+            "description": description,
+            "style": "natural"
+        }
+    )
+    
+    if not result or not result.get("success"):
+        await update.message.reply_text("❌ Ошибка при генерации промпта. Попробуй ещё раз.")
+        return
+    
+    prompt = result.get("prompt", "")
+    recommendations = result.get("recommendations", [])
+    
+    response = f"""📸 **Промпт для анимации:**
+
+{prompt}
+
+**Рекомендации:**
+"""
+    for rec in recommendations[:3]:
+        response += f"• {rec}\n"
+    
+    session = get_user_session(user_id)
+    session["state"] = "idle"
+    session["active_module"] = None
+    
+    keyboard = [
+        [InlineKeyboardButton("🔄 Создать ещё", callback_data="module_photo_animation")],
+        [InlineKeyboardButton("« В меню", callback_data="section_content")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(response, reply_markup=reply_markup, parse_mode="Markdown")
+
+
+async def handle_case_dialog(update: Update, user_id: int):
+    """Handle case dialog input"""
+    dialog_text = update.message.text
+    
+    await update.message.chat.send_action("typing")
+    
+    # Parse dialog into history format
+    lines = dialog_text.strip().split('\n')
+    history = []
+    
+    for line in lines:
+        if ':' in line:
+            role, text = line.split(':', 1)
+            role = role.strip().lower()
+            text = text.strip()
+            
+            if 'менеджер' in role or 'manager' in role:
+                history.append({"role": "user", "content": text})
+            elif 'клиент' in role or 'client' in role:
+                history.append({"role": "assistant", "content": text})
+    
+    result = await call_backend(
+        "/cases_analyzer/v1/analyze",
+        method="POST",
+        data={"history": history}
+    )
+    
+    if not result or not result.get("success"):
+        await update.message.reply_text("❌ Ошибка при анализе диалога. Попробуй ещё раз.")
+        return
+    
+    score = result.get("overall_score", 0)
+    feedback = result.get("feedback", "")
+    strengths = result.get("strengths", [])
+    improvements = result.get("improvements", [])
+    
+    response = f"""📊 **Анализ диалога**
+
+Общая оценка: {score}/10
+
+**Сильные стороны:**
+"""
+    for s in strengths[:3]:
+        response += f"✅ {s}\n"
+    
+    response += "\n**Что улучшить:**\n"
+    for imp in improvements[:3]:
+        response += f"💡 {imp}\n"
+    
+    if feedback:
+        response += f"\n**Общая обратная связь:**\n{feedback[:500]}"
+    
+    session = get_user_session(user_id)
+    session["state"] = "idle"
+    session["active_module"] = None
+    
+    keyboard = [
+        [InlineKeyboardButton("🔄 Анализ ещё", callback_data="module_cases_analyzer")],
+        [InlineKeyboardButton("« В меню", callback_data="section_content")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(response, reply_markup=reply_markup, parse_mode="Markdown")
 
 
 async def result_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
