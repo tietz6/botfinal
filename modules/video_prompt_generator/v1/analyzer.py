@@ -245,10 +245,15 @@ class VideoPromptAnalyzer:
         ]
         
         for i, scene in enumerate(timeline.scenes, 1):
+            # Safely truncate lyrics respecting character boundaries
+            lyrics_preview = scene.lyrics_segment
+            if len(lyrics_preview) > 100:
+                lyrics_preview = lyrics_preview[:97] + "..."
+            
             lines.extend([
                 f"Scene {i}: {scene.start_time:.1f}s - {scene.end_time:.1f}s",
                 f"Mood: {scene.mood}",
-                f"Lyrics: {scene.lyrics_segment[:100]}...",
+                f"Lyrics: {lyrics_preview}",
                 f"Visual: {scene.visual_prompt}",
                 f"Camera: {scene.camera_movement}",
                 "-" * 60,

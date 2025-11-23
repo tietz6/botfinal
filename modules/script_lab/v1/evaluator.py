@@ -26,6 +26,11 @@ class ScriptAnalysis(BaseModel):
 class ScriptEvaluator:
     """Evaluates sales scripts and provides detailed feedback"""
     
+    # Configuration constants
+    MIN_WORD_COUNT = 50
+    OPTIMAL_MIN_WORDS = 50
+    OPTIMAL_MAX_WORDS = 300
+    
     def __init__(self):
         self.criteria = {
             "structure": self._evaluate_structure,
@@ -123,7 +128,7 @@ class ScriptEvaluator:
         
         # Check length (not too short, not too long)
         word_count = len(script.split())
-        if 50 <= word_count <= 300:
+        if self.OPTIMAL_MIN_WORDS <= word_count <= self.OPTIMAL_MAX_WORDS:
             score += 10
         
         return min(score, 100)
@@ -267,7 +272,7 @@ class ScriptEvaluator:
         if script.count("?") < 2:
             weaknesses.append("Мало вопросов - диалог должен быть двусторонним")
         
-        if len(script.split()) < 50:
+        if len(script.split()) < self.MIN_WORD_COUNT:
             weaknesses.append("Скрипт слишком короткий - добавьте больше деталей")
         
         return weaknesses or ["Требуется доработка отдельных элементов"]
@@ -302,26 +307,36 @@ class ScriptEvaluator:
         return suggestions
     
     def _generate_improved_version(self, script: str, suggestions: List[str]) -> str:
-        """Generate an improved version of the script"""
+        """
+        Generate an improved version of the script.
         
-        # This is a simplified version - in production, would use LLM
-        improved = f"""
-Привет! Меня зовут [Ваше имя], я из компании "На Счастье". 
-Мы создаем персонализированные песни - уникальные музыкальные 
-подарки на основе реальных историй.
-
-{script}
-
-Расскажите, для кого планируете подарок? Какая у вас история?
-
-Представьте реакцию, когда этот человек услышит песню, 
-созданную специально о ваших моментах!
-
-Давайте начнем? Я задам несколько вопросов, чтобы понять 
-вашу историю, и наш автор создаст уникальный текст.
-        """.strip()
+        Note: This is a placeholder implementation that provides a basic template.
+        In production, this should integrate with LLM to generate truly improved
+        versions based on the specific suggestions provided.
+        """
         
-        return improved
+        # Placeholder: Basic template with key improvements suggested
+        improved_parts = [
+            "Привет! Меня зовут [Ваше имя], я из компании \"На Счастье\".",
+            "Мы создаем персонализированные песни - уникальные музыкальные подарки на основе реальных историй.",
+            "",
+            script.strip(),
+            "",
+            "Расскажите, для кого планируете подарок? Какая у вас история?",
+            "",
+            "Представьте реакцию, когда этот человек услышит песню, созданную специально о ваших моментах!",
+            "",
+            "Давайте начнем? Я задам несколько вопросов, чтобы понять вашу историю."
+        ]
+        
+        # Add note about suggestions
+        if suggestions:
+            improved_parts.append("")
+            improved_parts.append("Рекомендации для улучшения:")
+            for suggestion in suggestions[:3]:
+                improved_parts.append(f"• {suggestion}")
+        
+        return "\n".join(improved_parts)
 
 
 # Global instance

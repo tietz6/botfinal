@@ -75,11 +75,14 @@ async def synthesize_speech(request: TTSRequest):
         
         logger.info(f"TTS request: {word_count} words, voice={request.voice}, lang={request.language}")
         
+        # TODO: Integrate with actual TTS service
+        # For now, return a clear message that this is not yet implemented
         return {
-            "success": True,
-            "audio_url": None,  # TODO: Replace with actual audio URL
+            "success": False,
+            "audio_url": None,
             "duration": round(estimated_duration, 2),
-            "message": "TTS synthesis pending - integration with voice service required",
+            "message": "TTS synthesis not yet implemented - voice service integration required",
+            "status": "not_implemented",
             "details": {
                 "text_length": len(request.text),
                 "word_count": word_count,
@@ -87,7 +90,8 @@ async def synthesize_speech(request: TTSRequest):
                 "language": request.language,
                 "speed": request.speed,
                 "estimated_duration": round(estimated_duration, 2)
-            }
+            },
+            "note": "This endpoint is ready for integration with TTS services (e.g., Google TTS, Azure TTS, or voice_gateway)"
         }
     except HTTPException:
         raise
@@ -173,11 +177,13 @@ async def synthesize_encyclopedia_page(
         logger.info(f"TTS request for encyclopedia page: {page_id}")
         
         return {
-            "success": True,
+            "success": False,
             "page_id": page_id,
             "audio_url": None,
-            "message": "Encyclopedia TTS pending - integration required",
-            "voice": voice
+            "message": "Encyclopedia TTS not yet implemented - integration required",
+            "status": "not_implemented",
+            "voice": voice,
+            "note": "Requires integration with encyclopedia service and TTS provider"
         }
     except Exception as e:
         logger.error(f"Encyclopedia TTS failed for page {page_id}: {e}")
