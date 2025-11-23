@@ -67,13 +67,23 @@ SALESBOT provides comprehensive training modules for sales managers and content 
   - `/api/public/v1/health`: Health check
   - `/api/public/v1/routes_summary`: All available routes
   - 🆕 **Voice API** (`/voice/v1/`):
-    - `POST /asr`: Audio-to-text transcription
+    - `POST /asr`: Audio-to-text transcription (improved error handling)
     - `POST /tts`: Text-to-speech synthesis
     - `POST /chat/text`: Text-based LLM chat
     - `POST /chat/voice`: Voice-to-voice pipeline
+  - 🆕 **Script Lab** (`/script_lab/`):
+    - `POST /start/{session_id}`: Start interactive training session
+    - `POST /turn/{session_id}`: Process manager's turn
+    - `GET /result/{session_id}`: Get final training results
+    - `POST /analyze`: Analyze a sales script (static analysis)
+    - `GET /scenarios`: Get available training scenarios
+  - 🆕 **Encyclopedia** (`/encyclopedia/v1/`):
+    - `GET /pages?role={role}`: Get list of pages for role
+    - `GET /page/{page_id}?role={role}`: Get specific page content
+    - `POST /page/{page_id}/tts`: Generate TTS for page
   - 🆕 **Sleeping Dragon** (`/sleeping_dragon/v1/`):
     - `POST /analyze`: Analyze dialogue quality and get feedback
-  - Each module has:
+  - Each training module has:
     - `POST /<module>/start/{session_id}`: Start training session
     - `POST /<module>/turn/{session_id}`: Process manager's turn
     - `GET /<module>/snapshot/{session_id}`: Get session state
@@ -186,6 +196,22 @@ python simple_telegram_bot.py
   - 📸 Photo Animation - Animation prompts
   - 📊 Cases Analyzer - Dialogue analysis
 
+- **🎯 Training Panel** - Quick access menu (via `/panel` command)
+  - ✅ Тренировка - Access training modules
+  - 👤 Клиент - Client practice (in development)
+  - 🛡 Возражения - Objection handling
+  - 📈 Апселл - Upselling techniques
+  - 🎪 Арена - Free practice arena
+  - 📝 Экзамен - Final examination
+  - 📊 CRM - CRM system (coming soon)
+  - ❌ Скрыть меню - Return to main menu
+
+### Bot Commands
+- `/start` - Initial setup and main menu
+- `/panel` - Show training panel with quick access buttons
+- `/master` - Quick start Master Path training
+- `/result` - Get exam results (after completing exam)
+
 ### Training Sessions
 - Send text messages or voice messages during training
 - Bot responds as both client and coach
@@ -281,8 +307,10 @@ curl -X POST http://localhost:8080/voice/v1/chat/text \
 
 ### 🆕 Start Script Lab Training
 
+**NEW PATH**: Script Lab interactive training is now available at `/script_lab/start` and `/script_lab/turn` endpoints.
+
 ```bash
-curl -X POST http://localhost:8080/training_scripts/v1/start/session456 \
+curl -X POST http://localhost:8080/script_lab/start/session456 \
   -H "Content-Type: application/json" \
   -d '{"role": "manager", "topic": "song"}'
 ```
@@ -298,6 +326,35 @@ Response:
   "hints": ["Начни с тёплого приветствия", "Узнай контекст"]
 }
 ```
+
+Process a turn:
+```bash
+curl -X POST http://localhost:8080/script_lab/turn/session456 \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Здравствуйте! Как настроение?"}'
+```
+
+Response:
+```json
+{
+  "success": true,
+  "status": "active",
+  "stage": "greeting",
+  "client_reply": "Да, мне интересно! Расскажите, как это происходит?",
+  "coach_tip": "Обрати внимание: важно не давить, а показать ценность через историю клиента.",
+  "scores": {
+    "warmth": 2.0,
+    "clarity": 5.0,
+    "questions": 3.0,
+    "structure": 7.0,
+    "pressure_free": 10
+  },
+  "is_final": false,
+  "turn_count": 1
+}
+```
+
+**Note**: The old `/training_scripts/v1/` endpoints are still available for backward compatibility, but new integrations should use `/script_lab/` paths.
 
 ### 🆕 Get Encyclopedia Pages
 
