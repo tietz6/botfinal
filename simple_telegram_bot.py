@@ -217,6 +217,16 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await show_training_menu(query, user_id)
     elif data == "back_content":
         await show_content_menu(query, user_id)
+    
+    # Panel actions
+    elif data == "show_panel":
+        await show_panel_menu(query, user_id)
+    elif data == "panel_training":
+        await show_training_menu(query, user_id)
+    elif data == "panel_client":
+        await show_panel_client(query, user_id)
+    elif data == "panel_crm":
+        await show_panel_crm(query, user_id)
 
 
 async def set_user_role_handler(query, user_id: int, role: str):
@@ -262,7 +272,7 @@ async def show_training_menu(query, user_id: int):
 Выбери тренировку:"""
     
     keyboard = [
-        [InlineKeyboardButton("📖 Script Lab (практика скриптов)", callback_data="module_training_scripts")],
+        [InlineKeyboardButton("📖 Script Lab (практика скриптов)", callback_data="module_script_lab")],
         [InlineKeyboardButton("🎯 Путь Мастера", callback_data="module_master_path")],
         [InlineKeyboardButton("🛡️ Возражения", callback_data="module_objections")],
         [InlineKeyboardButton("💎 Допродажи", callback_data="module_upsell")],
@@ -392,6 +402,8 @@ async def show_main_menu(query, user_id: int):
     if role in ["generator", "admin"]:
         keyboard.append([InlineKeyboardButton("🎨 Создание контента", callback_data="section_content")])
     
+    # Add panel button for quick access to training modules
+    keyboard.append([InlineKeyboardButton("🎯 Панель тренировок", callback_data="show_panel")])
     keyboard.append([InlineKeyboardButton("👤 Изменить роль", callback_data="change_role")])
     
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -883,6 +895,85 @@ async def master_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(response_text, reply_markup=reply_markup, parse_mode="Markdown")
 
 
+def _get_panel_keyboard():
+    """Get training panel keyboard"""
+    return [
+        [InlineKeyboardButton("✅ Тренировка", callback_data="panel_training")],
+        [InlineKeyboardButton("👤 Клиент", callback_data="panel_client")],
+        [InlineKeyboardButton("🛡 Возражения", callback_data="module_objections")],
+        [InlineKeyboardButton("📈 Апселл", callback_data="module_upsell")],
+        [InlineKeyboardButton("🎪 Арена", callback_data="module_arena")],
+        [InlineKeyboardButton("📝 Экзамен", callback_data="module_exam")],
+        [InlineKeyboardButton("📊 CRM", callback_data="panel_crm")],
+        [InlineKeyboardButton("❌ Скрыть меню", callback_data="main_menu")]
+    ]
+
+
+async def panel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show additional training panel menu"""
+    text = """🎯 **Панель тренировок**
+
+Выбери действие:"""
+    
+    keyboard = _get_panel_keyboard()
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(text, reply_markup=reply_markup, parse_mode="Markdown")
+
+
+async def show_panel_menu(query, user_id: int):
+    """Show training panel menu"""
+    text = """🎯 **Панель тренировок**
+
+Выбери действие:"""
+    
+    keyboard = _get_panel_keyboard()
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text(text, reply_markup=reply_markup, parse_mode="Markdown")
+
+
+async def show_panel_client(query, user_id: int):
+    """Show client practice menu"""
+    text = """👤 **Практика с клиентом**
+
+Модуль в разработке. Скоро здесь будет:
+• Практика с различными типами клиентов
+• Отработка сложных ситуаций
+• Персонализированные сценарии
+
+Пока попробуй другие модули тренировки!"""
+    
+    keyboard = [
+        [InlineKeyboardButton("🎯 Путь Мастера", callback_data="module_master_path")],
+        [InlineKeyboardButton("📖 Script Lab", callback_data="module_script_lab")],
+        [InlineKeyboardButton("« Назад к панели", callback_data="show_panel")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text(text, reply_markup=reply_markup, parse_mode="Markdown")
+
+
+async def show_panel_crm(query, user_id: int):
+    """Show CRM placeholder"""
+    text = """📊 **CRM Система**
+    
+Раздел CRM будет подключён позже.
+
+Здесь будет:
+• История клиентов
+• Статистика продаж
+• Аналитика по сделкам
+• Отслеживание KPI
+
+Следи за обновлениями!"""
+    
+    keyboard = [[InlineKeyboardButton("« Назад к панели", callback_data="show_panel")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text(text, reply_markup=reply_markup, parse_mode="Markdown")
+
+
 async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle voice messages"""
     user_id = update.effective_user.id
@@ -1020,6 +1111,7 @@ def main():
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("master", master_command))
     application.add_handler(CommandHandler("result", result_command))
+    application.add_handler(CommandHandler("panel", panel_command))
     application.add_handler(CallbackQueryHandler(button_callback))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     application.add_handler(MessageHandler(filters.VOICE, handle_voice))

@@ -59,7 +59,7 @@ async def transcribe_audio(audio: UploadFile = File(...)):
         audio: Audio file (OGG, WAV, MP3)
     
     Returns:
-        Transcribed text
+        Transcribed text or error response
     """
     try:
         # Read audio data
@@ -71,16 +71,19 @@ async def transcribe_audio(audio: UploadFile = File(...)):
         # Transcribe
         text = await asr.transcribe(audio_data)
         
+        # Check if ASR returned an error message (starts with "[")
         if text.startswith("["):
-            # Error message from ASR
-            raise HTTPException(status_code=500, detail=text)
+            # Return structured error response instead of raising exception
+            return ASRResponse(text="", success=False)
         
         return ASRResponse(text=text, success=True)
         
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"ASR failed: {str(e)}")
+        # Return structured error response
+        logger.error(f"ASR failed: {e}")
+        return ASRResponse(text="", success=False)
 
 
 @router.post("/tts")
