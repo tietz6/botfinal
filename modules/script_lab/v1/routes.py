@@ -12,6 +12,9 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/script_lab", tags=["script-lab"])
 
+# Constants
+SCORE_SCALE_FACTOR = 10  # Scale 0-10 scores to 0-100
+
 
 class ScriptRequest(BaseModel):
     """Request to analyze a script"""
@@ -367,7 +370,7 @@ async def get_result(session_id: str):
         
         # Calculate final score
         scores = session_state["scores"]
-        final_score = sum(scores.values()) / len(scores) * 10  # Scale to 100
+        final_score = sum(scores.values()) / len(scores) * SCORE_SCALE_FACTOR
         
         # Determine grade
         if final_score >= 85:

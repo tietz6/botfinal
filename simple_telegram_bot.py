@@ -895,13 +895,9 @@ async def master_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(response_text, reply_markup=reply_markup, parse_mode="Markdown")
 
 
-async def panel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Show additional training panel menu"""
-    text = """🎯 **Панель тренировок**
-
-Выбери действие:"""
-    
-    keyboard = [
+def _get_panel_keyboard():
+    """Get training panel keyboard"""
+    return [
         [InlineKeyboardButton("✅ Тренировка", callback_data="panel_training")],
         [InlineKeyboardButton("👤 Клиент", callback_data="panel_client")],
         [InlineKeyboardButton("🛡 Возражения", callback_data="module_objections")],
@@ -911,6 +907,15 @@ async def panel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("📊 CRM", callback_data="panel_crm")],
         [InlineKeyboardButton("❌ Скрыть меню", callback_data="main_menu")]
     ]
+
+
+async def panel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show additional training panel menu"""
+    text = """🎯 **Панель тренировок**
+
+Выбери действие:"""
+    
+    keyboard = _get_panel_keyboard()
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await update.message.reply_text(text, reply_markup=reply_markup, parse_mode="Markdown")
@@ -922,16 +927,7 @@ async def show_panel_menu(query, user_id: int):
 
 Выбери действие:"""
     
-    keyboard = [
-        [InlineKeyboardButton("✅ Тренировка", callback_data="panel_training")],
-        [InlineKeyboardButton("👤 Клиент", callback_data="panel_client")],
-        [InlineKeyboardButton("🛡 Возражения", callback_data="module_objections")],
-        [InlineKeyboardButton("📈 Апселл", callback_data="module_upsell")],
-        [InlineKeyboardButton("🎪 Арена", callback_data="module_arena")],
-        [InlineKeyboardButton("📝 Экзамен", callback_data="module_exam")],
-        [InlineKeyboardButton("📊 CRM", callback_data="panel_crm")],
-        [InlineKeyboardButton("❌ Скрыть меню", callback_data="main_menu")]
-    ]
+    keyboard = _get_panel_keyboard()
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await query.edit_message_text(text, reply_markup=reply_markup, parse_mode="Markdown")
@@ -940,7 +936,7 @@ async def show_panel_menu(query, user_id: int):
 async def show_panel_client(query, user_id: int):
     """Show client practice menu"""
     text = """👤 **Практика с клиентом**
-    
+
 Модуль в разработке. Скоро здесь будет:
 • Практика с различными типами клиентов
 • Отработка сложных ситуаций
@@ -1119,7 +1115,7 @@ def main():
     application.add_handler(CallbackQueryHandler(button_callback))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     application.add_handler(MessageHandler(filters.VOICE, handle_voice))
-    application.add_handler(error_handler)
+    application.add_error_handler(error_handler)
     
     # Start bot
     logger.info("Bot started. Press Ctrl+C to stop.")
