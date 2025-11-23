@@ -4,14 +4,36 @@ AI-powered training system for sales managers in the "На Счастье" proje
 
 ## 🎯 Overview
 
-SALESBOT provides comprehensive training modules for sales managers to practice:
+SALESBOT provides comprehensive training modules for sales managers and content creators in the "На Счастье" project:
+
+### 🎓 Sales School (Training Modules)
+- **Script Lab**: Interactive sales script practice with AI coach
 - **Master Path**: Full sales cycle from greeting to final deal
 - **Objections**: Handling customer objections with empathy
 - **Upsell**: Cross-selling and upselling techniques
 - **Arena**: Free-form dialog practice with different client types
 - **Exam**: Final assessment with scoring
-- **Sleeping Dragon**: 🆕 Dialogue quality analysis and feedback
-- **Voice Support**: 🆕 Text and voice message training via Telegram
+- **Sleeping Dragon**: Dialogue quality analysis and feedback
+
+### 📚 Knowledge Base
+- **Encyclopedia**: Comprehensive documentation with role-based access
+- Training materials for managers and content creators
+- Product documentation and sales guidelines
+
+### 🎨 Content Creation Tools (for generators)
+- **Song Generator**: AI-powered personalized song creation
+- **Video Prompt Generator**: Scene-by-scene video timeline generation
+- **Photo Animation**: Animation prompts for photo enhancement
+- **Cases Analyzer**: Dialogue analysis with detailed feedback
+
+### 🎭 Role-Based Access
+- **Manager**: Sales training and client communication
+- **Generator**: Content creation and production tools
+- **Admin**: Full access to all modules
+
+### 🎤 Voice Support
+- Text and voice message training via Telegram
+- Audio transcription and synthesis
 
 ## 🏗️ Architecture
 
@@ -24,12 +46,22 @@ SALESBOT provides comprehensive training modules for sales managers to practice:
 - **Training Modules** (all in `modules/`):
   - `dialog_memory/v1`: Session history and state management
   - `deepseek_persona/v1`: Brand voice ("На Счастье" style)
+  - `training_scripts/v1`: 🆕 Script Lab - Interactive script practice
   - `master_path/v1`: Full sales cycle training
   - `objections/v1`: Objection handling training
   - `upsell/v1`: Upselling techniques
   - `arena/v1`: Free-form dialog practice
   - `exam/v1`: Final assessment
-  - `sleeping_dragon/v1`: 🆕 Dialogue analysis and coaching feedback
+  - `sleeping_dragon/v1`: Dialogue analysis and coaching feedback
+
+- **Knowledge Base**:
+  - `encyclopedia/v1`: 🆕 Role-based documentation and training materials
+
+- **Content Creation Modules**:
+  - `song_generator/v1`: 🆕 AI-powered song text generation
+  - `video_prompt_generator/v1`: 🆕 Video timeline and prompt generation
+  - `photo_animation/v1`: 🆕 Photo animation prompt generation
+  - `cases_analyzer/v1`: 🆕 Dialogue analysis with feedback
 
 - **API Endpoints**:
   - `/api/public/v1/health`: Health check
@@ -50,9 +82,13 @@ SALESBOT provides comprehensive training modules for sales managers to practice:
 ### Telegram Bot
 - User-friendly interface for training
 - Interactive menu with inline keyboards
+- 🆕 **Role-based access**: Select role on first use (manager/generator/admin)
+- 🆕 **Sales School**: Integrated training modules including Script Lab
+- 🆕 **Knowledge Base**: Access to encyclopedia with role filtering
+- 🆕 **Content Creation**: Song, video, and photo generation tools
 - Real-time conversation with AI clients and coaches
-- 🆕 **Voice message support**: Send and receive voice messages
-- 🆕 **Text + Voice**: Works with both message types
+- **Voice message support**: Send and receive voice messages
+- **Text + Voice**: Works with both message types
 - Session management per user
 
 ## 🚀 Quick Start
@@ -116,6 +152,51 @@ In a separate terminal:
 ```bash
 python simple_telegram_bot.py
 ```
+
+## 📱 Using the Telegram Bot
+
+### First Time Setup
+1. Send `/start` to the bot
+2. Choose your role:
+   - 👨‍💼 **Manager** - For sales training and client communication
+   - 🎨 **Generator** - For content creation tools
+   - 👑 **Admin** - Full access to all features
+3. Select from the main menu
+
+### Main Menu Structure
+- **🎓 Sales School** - Training modules for managers
+  - 📖 Script Lab - Interactive script practice
+  - 🎯 Master Path - Full sales cycle
+  - 🛡️ Objections - Handle customer concerns
+  - 💎 Upsell - Cross-selling techniques
+  - 🎪 Arena - Free practice
+  - 📝 Exam - Final assessment
+
+- **📚 Knowledge Base** - Documentation (role-filtered)
+  - Company introduction
+  - Sales basics
+  - Song creation process
+  - Photo animation guide
+  - Video production
+  - Real cases and examples
+
+- **🎨 Content Creation** (Generator/Admin only)
+  - 🎵 Song Generator - Create personalized songs
+  - 🎬 Video Prompts - Generate video timelines
+  - 📸 Photo Animation - Animation prompts
+  - 📊 Cases Analyzer - Dialogue analysis
+
+### Training Sessions
+- Send text messages or voice messages during training
+- Bot responds as both client and coach
+- Get real-time feedback on your technique
+- Practice until you feel confident
+
+### Content Generation
+1. Select a content tool from the menu
+2. Follow the prompts to provide input
+3. Receive AI-generated content
+4. Use "Create another" to generate more
 
 ## 📝 API Usage Examples
 
@@ -198,6 +279,98 @@ curl -X POST http://localhost:8080/voice/v1/chat/text \
   }'
 ```
 
+### 🆕 Start Script Lab Training
+
+```bash
+curl -X POST http://localhost:8080/training_scripts/v1/start/session456 \
+  -H "Content-Type: application/json" \
+  -d '{"role": "manager", "topic": "song"}'
+```
+
+Response:
+```json
+{
+  "success": true,
+  "status": "active",
+  "stage": "greeting",
+  "coach_message": "Привет! Сегодня мы потренируем твой скрипт продажи...",
+  "client_message": "Отлично! Мне нравится такой подход. Что дальше?",
+  "hints": ["Начни с тёплого приветствия", "Узнай контекст"]
+}
+```
+
+### 🆕 Get Encyclopedia Pages
+
+```bash
+curl "http://localhost:8080/encyclopedia/v1/pages?role=manager"
+```
+
+Response:
+```json
+{
+  "success": true,
+  "total": 6,
+  "pages": [
+    {
+      "id": "intro",
+      "title": "Добро пожаловать в «На Счастье»",
+      "description": "Знакомство с компанией, ценностями и миссией"
+    },
+    {
+      "id": "sales_basics",
+      "title": "Основы общения с клиентами",
+      "description": "Принципы тёплого и эффективного общения"
+    }
+  ]
+}
+```
+
+### 🆕 Generate Song
+
+```bash
+curl -X POST http://localhost:8080/song_generator/v1/generate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "story": "Песня для жены на юбилей свадьбы. 10 лет вместе...",
+    "style": "romantic",
+    "mood": "love"
+  }'
+```
+
+Response:
+```json
+{
+  "success": true,
+  "song": {
+    "title": "Десять лет с тобой",
+    "lyrics": "Куплет 1:\n...",
+    "structure": {
+      "intro": "...",
+      "verse1": "...",
+      "chorus": "..."
+    }
+  }
+}
+```
+
+### 🆕 Set User Role
+
+```bash
+curl -X POST http://localhost:8080/api/public/v1/set_role \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": "123456", "role": "manager"}'
+```
+
+Response:
+```json
+{
+  "success": true,
+  "user_id": "123456",
+  "role": "manager",
+  "message": "Role manager assigned to user 123456"
+}
+```
+
 ### Get Session Snapshot
 
 ```bash
@@ -246,7 +419,15 @@ Final assessment:
 - Score: 0-100
 - Grade: A/B/C/D
 
-### 6. 🆕 Sleeping Dragon (`/sleeping_dragon/v1`)
+### 6. 🆕 Script Lab (`/training_scripts/v1`)
+Interactive sales script practice:
+- AI plays both client and coach roles
+- Real-time feedback on technique
+- Multiple topics: song, photo, cartoon, custom
+- Stage-based progression (greeting → discovery → presentation → closing)
+- Scoring across multiple criteria
+
+### 7. 🆕 Sleeping Dragon (`/sleeping_dragon/v1`)
 Dialogue quality analysis:
 - Analyzes manager's dialogue quality
 - 5 evaluation metrics (warmth, questions, structure, no pressure, active listening)
@@ -254,6 +435,45 @@ Dialogue quality analysis:
 - Score: 0-10
 - Identifies specific issues
 - Suggests improvements
+
+## 📚 Knowledge Base & Content Tools
+
+### 🆕 Encyclopedia (`/encyclopedia/v1`)
+Role-based documentation system:
+- Company introduction and values
+- Sales basics and communication principles
+- Product guides (songs, photo animation, videos)
+- Real-world case studies
+- Access filtered by user role
+
+### 🆕 Song Generator (`/song_generator/v1`)
+AI-powered song creation:
+- Multiple styles: romantic, rock, pop, acoustic, rap, jazz
+- Emotional moods: love, support, celebration, gratitude, etc.
+- Structured output: intro, verses, chorus, bridge
+- Cover image prompts
+- Voice performance notes
+
+### 🆕 Video Prompt Generator (`/video_prompt_generator/v1`)
+Timeline generation for AI video:
+- Platform-specific prompts: Sora, VEO, Pika, Runway
+- Scene-by-scene breakdown
+- Emotion and visual style guidance
+- Configurable chunk duration
+
+### 🆕 Photo Animation (`/photo_animation/v1`)
+Animation prompt generation:
+- Photo analysis with recommendations
+- Animation style suggestions
+- Technical prompts for D-ID, Pika, Runway
+- Emotion and action guidance
+
+### 🆕 Cases Analyzer (`/cases_analyzer/v1`)
+Dialogue analysis tool:
+- Comprehensive dialogue evaluation
+- Score across multiple criteria
+- Identification of key moments
+- Specific improvement recommendations
 
 ## 🎨 Brand Voice ("На Счастье")
 
@@ -283,21 +503,26 @@ botfinal/
 │       ├── tts.py         # Text-to-speech
 │       └── pipeline.py    # Voice-to-voice
 ├── modules/
-│   ├── dialog_memory/v1/      # Session management
-│   ├── deepseek_persona/v1/   # Brand voice
-│   │   └── persona.json       # 🆕 Brand guidelines
-│   ├── master_path/v1/        # Full cycle training
-│   ├── objections/v1/         # Objections
-│   ├── upsell/v1/             # Upselling
-│   ├── arena/v1/              # Free practice
-│   ├── exam/v1/               # Assessment
-│   └── sleeping_dragon/v1/    # 🆕 Dialogue analysis
-│       ├── engine.py          # Analysis engine
-│       └── routes.py          # API routes
+│   ├── dialog_memory/v1/          # Session management
+│   ├── deepseek_persona/v1/       # Brand voice
+│   │   └── persona.json           # Brand guidelines
+│   ├── training_scripts/v1/       # 🆕 Script Lab
+│   ├── master_path/v1/            # Full cycle training
+│   ├── objections/v1/             # Objections
+│   ├── upsell/v1/                 # Upselling
+│   ├── arena/v1/                  # Free practice
+│   ├── exam/v1/                   # Assessment
+│   ├── sleeping_dragon/v1/        # Dialogue analysis
+│   ├── encyclopedia/v1/           # 🆕 Knowledge base
+│   ├── song_generator/v1/         # 🆕 Song creation
+│   ├── video_prompt_generator/v1/ # 🆕 Video prompts
+│   ├── photo_animation/v1/        # 🆕 Photo animation
+│   └── cases_analyzer/v1/         # 🆕 Case analysis
 └── api/
-    ├── public/v1/             # Public API endpoints
-    └── voice/v1/              # 🆕 Voice API
-        └── routes.py          # ASR, TTS, chat
+    ├── public/v1/                 # Public API endpoints
+    │   └── roles management       # 🆕 User roles
+    └── voice/v1/                  # Voice API
+        └── routes.py              # ASR, TTS, chat
 ```
 
 ### Adding New Modules
