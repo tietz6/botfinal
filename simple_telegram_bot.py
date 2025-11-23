@@ -34,6 +34,26 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Configuration constants
+MAX_ENCYCLOPEDIA_PAGES = 8  # Maximum number of encyclopedia pages to display
+MAX_CONTENT_LENGTH = 3000   # Maximum content length before truncation
+MAX_LYRICS_LENGTH = 2000    # Maximum lyrics length before truncation
+MAX_SCENES_DISPLAY = 5      # Maximum number of video scenes to display
+MAX_FEEDBACK_LENGTH = 500   # Maximum feedback length before truncation
+MAX_STRENGTHS_DISPLAY = 3   # Maximum number of strengths to display
+MAX_IMPROVEMENTS_DISPLAY = 3  # Maximum number of improvements to display
+
+# Default content generation parameters
+DEFAULT_SONG_STYLE = "romantic"
+DEFAULT_SONG_MOOD = "love"
+DEFAULT_VIDEO_PLATFORM = "sora"
+DEFAULT_VIDEO_STYLE = "cinematic"
+DEFAULT_PHOTO_ANIMATION_STYLE = "natural"
+
+# Dialog role identifiers
+MANAGER_ROLE_KEYWORDS = ['менеджер', 'manager']
+CLIENT_ROLE_KEYWORDS = ['клиент', 'client']
+
 # User session storage (in-memory for simplicity)
 user_sessions: Dict[int, Dict[str, Any]] = {}
 
@@ -278,7 +298,7 @@ async def show_encyclopedia_menu(query, user_id: int):
     keyboard = []
     pages = pages_response.get("pages", [])
     
-    for page in pages[:8]:  # Limit to 8 pages to fit in message
+    for page in pages[:MAX_ENCYCLOPEDIA_PAGES]:
         page_id = page.get("id", "")
         title = page.get("title", "")
         keyboard.append([InlineKeyboardButton(f"📄 {title}", callback_data=f"encyclopedia_{page_id}")])
@@ -330,9 +350,9 @@ async def show_encyclopedia_page(query, user_id: int, page_id: str):
     # Format content (limit to Telegram message size)
     text = f"""📄 **{title}**
 
-{content[:3000]}"""
+{content[:MAX_CONTENT_LENGTH]}"""
     
-    if len(content) > 3000:
+    if len(content) > MAX_CONTENT_LENGTH:
         text += "\n\n_...текст обрезан, полная версия доступна в API_"
     
     keyboard = [[InlineKeyboardButton("« Назад к базе знаний", callback_data="section_encyclopedia")]]
@@ -606,8 +626,8 @@ async def handle_song_story(update: Update, user_id: int):
         method="POST",
         data={
             "story": story,
-            "style": "romantic",  # Default style
-            "mood": "love"
+            "style": DEFAULT_SONG_STYLE,
+            "mood": DEFAULT_SONG_MOOD
         }
     )
     
@@ -621,9 +641,9 @@ async def handle_song_story(update: Update, user_id: int):
     
     response = f"""🎵 **{title}**
 
-{lyrics[:2000]}"""
+{lyrics[:MAX_LYRICS_LENGTH]}"""
     
-    if len(lyrics) > 2000:
+    if len(lyrics) > MAX_LYRICS_LENGTH:
         response += "\n\n_...текст обрезан для отображения_"
     
     # Reset session
@@ -651,8 +671,8 @@ async def handle_video_song(update: Update, user_id: int):
         method="POST",
         data={
             "song_text": song_text,
-            "platform": "sora",
-            "visual_style": "cinematic"
+            "platform": DEFAULT_VIDEO_PLATFORM,
+            "visual_style": DEFAULT_VIDEO_STYLE
         }
     )
     
@@ -663,7 +683,7 @@ async def handle_video_song(update: Update, user_id: int):
     timeline = result.get("timeline", [])
     
     response = "🎬 **Видео-таймлайн:**\n\n"
-    for i, scene in enumerate(timeline[:5], 1):  # Show first 5 scenes
+    for i, scene in enumerate(timeline[:MAX_SCENES_DISPLAY], 1):
         prompt = scene.get("prompt", "")
         response += f"**Сцена {i}:**\n{prompt}\n\n"
     
@@ -691,7 +711,7 @@ async def handle_photo_description(update: Update, user_id: int):
         method="POST",
         data={
             "description": description,
-            "style": "natural"
+            "style": DEFAULT_PHOTO_ANIMATION_STYLE
         }
     )
     
@@ -735,15 +755,22 @@ async def handle_case_dialog(update: Update, user_id: int):
     history = []
     
     for line in lines:
-        if ':' in line:
-            role, text = line.split(':', 1)
-            role = role.strip().lower()
-            text = text.strip()
-            
-            if 'менеджер' in role or 'manager' in role:
-                history.append({"role": "user", "content": text})
-            elif 'клиент' in role or 'client' in role:
-                history.append({"role": "assistant", "content": text})
+        if ':' not in line:
+            continue  # Skip lines without role separator
+        
+        parts = line.split(':', 1)
+        if len(parts) != 2:
+            continue  # Skip malformed lines
+        
+        role, text = parts
+        role = role.strip().lower()
+        text = text.strip()
+        
+        # Map role to API format
+        if any(keyword in role for keyword in MANAGER_ROLE_KEYWORDS):
+            history.append({"role": "user", "content": text})
+        elif any(keyword in role for keyword in CLIENT_ROLE_KEYWORDS):
+            history.append({"role": "assistant", "content": text})
     
     result = await call_backend(
         "/cases_analyzer/v1/analyze",
@@ -766,15 +793,15 @@ async def handle_case_dialog(update: Update, user_id: int):
 
 **Сильные стороны:**
 """
-    for s in strengths[:3]:
+    for s in strengths[:MAX_STRENGTHS_DISPLAY]:
         response += f"✅ {s}\n"
     
     response += "\n**Что улучшить:**\n"
-    for imp in improvements[:3]:
+    for imp in improvements[:MAX_IMPROVEMENTS_DISPLAY]:
         response += f"💡 {imp}\n"
     
     if feedback:
-        response += f"\n**Общая обратная связь:**\n{feedback[:500]}"
+        response += f"\n**Общая обратная связь:**\n{feedback[:MAX_FEEDBACK_LENGTH]}"
     
     session = get_user_session(user_id)
     session["state"] = "idle"
